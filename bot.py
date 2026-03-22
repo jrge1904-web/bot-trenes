@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import urllib3
 from datetime import datetime, timedelta
+import pytz # Para manejar la hora de España
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -14,6 +15,22 @@ def enviar_telegram(mensaje):
     requests.post(url, json={"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}, verify=False)
 
 def check_adif():
+    # Ajustamos a la hora de España
+    espana_tz = pytz.timezone('Europe/Madrid')
+    ahora = datetime.now(espana_tz)
+    hora_actual = ahora.strftime("%H:%M")
+    
+    # --- 1. Informe de Buenos Días (10:00 AM) ---
+    if hora_actual == "10:00":
+        enviar_telegram("☀️ *¡Buenos días!* \nComienzo mi jornada de vigilancia. Te avisaré si detecto retrasos mayores a 20 min o cancelaciones.")
+        return # No hace falta mirar trenes justo en este segundo
+
+    # --- 2. Informe de Fin de Jornada (22:00 PM) ---
+    if hora_actual == "22:00":
+        enviar_telegram("🌙 *Fin de jornada* \nHasta aquí mi vigilancia por hoy. ¡Que descanses!")
+        return
+
+    # --- 3. Vigilancia Normal de Retrasos ---
     url = "http://www.adif.es/estaciones/infotren/infotren_resultado.jsp"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, verify=False, timeout=20)
