@@ -5,39 +5,51 @@ import urllib3
 from datetime import datetime, timedelta
 import pytz
 
-# Desactivar avisos de seguridad de conexiones no seguras
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- CONFIGURACIÓN SEGURA MEDIANTE SECRETS ---
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+# Ya no usaremos un solo CHAT_ID fijo, sino una lista
 UMBRAL = 20
 
-def enviar_telegram(mensaje):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": mensaje, "parse_mode": "Markdown"}
+def obtener_usuarios():
+    """Función para obtener todos los usuarios que han iniciado el bot"""
+    url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
+    usuarios = set()
+    # Añadimos tu ID por defecto desde los Secrets por si acaso
+    mi_id = os.getenv("TELEGRAM_CHAT_ID")
+    if mi_id: usuarios.add(mi_id)
+    
     try:
-        requests.post(url, json=payload, verify=False, timeout=10)
-    except Exception as e:
-        print(f"Error enviando a Telegram: {e}")
+        r = requests.get(url, verify=False, timeout=10).json()
+        if "result" in r:
+            for update in r["result"]:
+                if "message" in update:
+                    usuarios.add(str(update["message"]["chat"]["id"]))
+    except: pass
+    return usuarios
+
+def enviar_telegram_a_todos(mensaje):
+    usuarios = obtener_usuarios()
+    for user_id in usuarios:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        payload = {"chat_id": user_id, "text": mensaje, "parse_mode": "Markdown"}
+        try:
+            requests.post(url, json=payload, verify=False, timeout=5)
+        except: pass
 
 def check_adif():
-    # Ajuste de hora a España
     espana_tz = pytz.timezone('Europe/Madrid')
     ahora = datetime.now(espana_tz)
     hora_actual = ahora.strftime("%H:%M")
     
-    # 1. Informe de Buenos Días (10:00 AM)
     if hora_actual == "10:00":
-        enviar_telegram("☀️ *¡Buenos días!* \nComienzo mi jornada de vigilancia. Te avisaré si detecto retrasos mayores a 20 min o cancelaciones.")
+        enviar_telegram_a_todos("☀️ *¡Buenos días!* \nSoy el Vigilante de Trenes. He empezado mi turno y os avisaré de cualquier incidencia grave.")
         return
 
-    # 2. Informe de Fin de Jornada (22:00 PM)
     if hora_actual == "22:00":
-        enviar_telegram("🌙 *Fin de jornada* \nHasta aquí mi vigilancia por hoy. ¡Que descanses!")
+        enviar_telegram_a_todos("🌙 *Fin de jornada* \nHasta mañana. ¡Que descanséis!")
         return
 
-    # 3. Vigilancia de Trenes
     url = "http://www.adif.es/estaciones/infotren/infotren_resultado.jsp"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, verify=False, timeout=20)
@@ -53,20 +65,17 @@ def check_adif():
                 h_prog = cols[3].text.strip()
                 estado = cols[4].text.strip().upper()
 
-                # Detectar Cancelaciones
                 if "CANCELADO" in estado or "SUPRIMIDO" in estado:
-                    enviar_telegram(f"❌ *TREN CANCELADO*\n🚆 {num}\n📍 {orig} ➔ {dest}")
+                    enviar_telegram_a_todos(f"❌ *TREN CANCELADO*\n🚆 {num}\n📍 {orig} ➔ {dest}")
                 
-                # Detectar Retrasos
                 mins_str = "".join(filter(str.isdigit, estado))
                 if mins_str:
                     mins = int(mins_str)
                     if mins >= UMBRAL:
                         h_p = datetime.strptime(h_prog, "%H:%M")
                         h_est = (h_p + timedelta(minutes=mins)).strftime("%H:%M")
-                        enviar_telegram(f"⚠️ *RETRASO >{UMBRAL}min*\n🚆 {num}\n⏰ {mins} min (Llegada: {h_est})\n📍 {orig} ➔ {dest}")
-    except Exception as e:
-        print(f"Error al consultar Adif: {e}")
+                        enviar_telegram_a_todos(f"⚠️ *RETRASO >{UMBRAL}min*\n🚆 {num}\n⏰ {mins} min (Llega: {h_est})\n📍 {orig} ➔ {dest}")
+    except: pass
 
 if __name__ == "__main__":
     check_adif()
