@@ -1,0 +1,15 @@
+name: Vigilancia Trenes
+on:
+  schedule:
+    - cron: '*/20 * * * *'  # Esto le dice: "Despierta cada 20 minutos"
+  workflow_dispatch:        # Esto sirve para que tú puedas darle al "Play" cuando quieras
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: pip install requests beautifulsoup4
+      - run: python bot.py
