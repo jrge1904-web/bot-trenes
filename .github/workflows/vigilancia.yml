@@ -2,10 +2,10 @@ name: Vigilancia Trenes
 
 on:
   schedule:
-    - cron: '*/20 * * * *'  # Revisión cada 20 minutos
-    - cron: '0 8 * * *'     # 10:00 AM España (8:00 UTC)
-    - cron: '0 20 * * *'    # 22:00 PM España (20:00 UTC)
-  workflow_dispatch:        # Permite ejecutarlo manualmente
+    - cron: '*/20 * * * *'  # Se ejecuta cada 20 minutos
+    - cron: '0 8 * * *'     # 10:00 AM en España (8:00 UTC)
+    - cron: '0 20 * * *'    # 22:00 PM en España (20:00 UTC)
+  workflow_dispatch:        # Permite el botón "Run workflow" manual
 
 jobs:
   run-bot:
